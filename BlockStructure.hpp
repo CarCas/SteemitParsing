@@ -23,6 +23,7 @@ private:
     std::string voter, author, permlink, timestamp;
     int weight;
 public:
+    Vote();
     Vote(std::string voter, std::string author, std::string permlink, int weigth, string timestamp);
     virtual std::string print();
     std::string get_voter();

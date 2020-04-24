@@ -7,13 +7,16 @@
 #include <fstream>
 #include <algorithm>
 #include <map>
-#include <filesystem>
+#include <experimental/filesystem>
+//#include <filesystem>
 #include <sstream>
 
 #include "constants.hpp"
 #include "UserStructure.hpp"
 #include "BlockStructure.hpp"
 #include "clock.hpp"
+	
+//#define NDEBUG
 
 #include "rapidjson/rapidjson.h"
 #include "rapidjson/document.h"
@@ -27,7 +30,8 @@ using ui = unsigned int;
 
 class ParsingBlocks {
 private:
-    std::string delim_row = string(1, DELIMITER) + DELIMITER;
+    //wchar_t DELIMITER[10];
+    //std::string "\"\n" = string(2, DELIMITER);
     struct ordered_by_how_publish {
         std::string name;
         ui count;
@@ -62,6 +66,7 @@ private:
     struct comment_element {
         char is_post;
         std::string author;
+        std::string parent_permlink;
         std::string permlink;
         std::string timestamp;
         std::string how_published;
@@ -72,12 +77,22 @@ private:
     struct follow_element {
         std::string following;
         std::string follower;
+        std::string timestamp;
     };
 
     struct reblog_element {
         std::string account;
         std::string author;
         std::string permlink;
+        std::string timestamp;
+    };
+
+    struct transfer_element {
+        std::string sender;
+        std::string recipient;
+        std::string memo;
+        std::string amount;
+        std::string timestamp;
     };
 
     vector<ordered_by_money> sbd_users;
@@ -101,9 +116,17 @@ private:
     vector<follow_element>  follows;
     vector<reblog_element>  reblogs;
     vector<comment_element> comments;
+    vector<transfer_element> transfers;
+    vector<std::string> jump_transactions_id {"930e0bbab0d57fcb90ced7b89ed644209c6536bf", "cef1ff03c88aea0d27ea8565a280c8c10222572d",                
+		"216075d4d40f27697108d89d33c09f53d467430f", "aff24ac24bca0f5eb9e0c703f509fb9c91e68034", "d2ec904250e8f71ffd6b1f31d71b7f8b1d2a31a1",
+		"a1f810e8fd61964b2d3479a721d9fc70af66741d", "85c8833bee1fe20c79d974f3c9adc7bc8a73baea", "acdfc4fbb71dec17e78d4cbc38f79a27e228c45d",
+        "17dd855ebd83fbfa198970f7615a4208cd6c4483", "006bbd83f82c7775d559675f2ed134b500023f9e", "96e2e6159f44d850ebc78cbe751608de63e34077",
+        "36b36f2543fdfe888cd6709a03e410f02a69d0a6"};
 
-    vector<std::string> jump_transactions_id {"4fb6d6455ee6304640925711b3e1b6aaa739f507"};
-
+    vector<std::string> jump_block_id {};
+    // "4fb6d6455ee6304640925711b3e1b6aaa739f507", "e0f10fb165cb2a97071a23a9c16511d1755a8f02", "db69b6eb8583dd7cf0aa18fd147d6e5c6a04b57e"};
+    // "01a4e5613e5ccb86e2eae80be4779811c91b98c8"
+    //vector<std::string> jump_author_name {}; //"steempoll"};
 
     int overall_no_vote_bots = 0, overall_no_vote_users = 0;
     int overall_no_post_bots = 0, overall_no_post_users = 0;
@@ -113,6 +136,7 @@ private:
     int overall_no_follow_by_bots = 0, overall_no_follow_by_users = 0;
     int overall_no_users_following_bots = 0, overall_no_bots_following_users = 0;
     int overall_no_bots_following_bots = 0, overall_no_users_following_users = 0;
+
 
 
     std::string users_path, rep_path, bot_path;
@@ -145,6 +169,7 @@ private:
         return els;
     }
 
+    /*
     std::string comment_hub_of_author(std::string author){
         list<string> to_save = all_comment_hubs(author);
         std::string sav = "";
@@ -155,11 +180,14 @@ private:
         }
         return sav;
     }
+    */
 
     void saving(string folder, string filepath, string tosave){
         fstream f;
-        if(!std::filesystem::exists(folder))
-            std::filesystem::create_directories(folder);
+        if(!std::experimental::filesystem::exists(folder))
+            std::experimental::filesystem::create_directories(folder);
+        //if(!std::filesystem::exists(folder))
+        //    std::filesystem::create_directories(folder);
         string tmp = folder + "/" + filepath;
         f.open(tmp, std::fstream::in | std::fstream::out | std::fstream::app);
         if (!f)
@@ -193,45 +221,62 @@ private:
             arr.push_back(current);
             current=strtok(NULL,sep.c_str());
         }
+        if(arr.size() == 0)
+            arr.push_back(str);
         return arr;
     }
 
     void add_to_votes_file(){
         fstream f;
-        if(!std::filesystem::exists(OPERATIONS_FOLDER))
-            std::filesystem::create_directories(OPERATIONS_FOLDER);
+        bool built = false;
+        //if(!std::filesystem::exists(OPERATIONS_FOLDER))
+        //    std::filesystem::create_directories(OPERATIONS_FOLDER);
+        if(!std::experimental::filesystem::exists(OPERATIONS_FOLDER))
+            std::experimental::filesystem::create_directories(OPERATIONS_FOLDER);
         f.open(VOTES_FILE, std::fstream::in | std::fstream::out | std::fstream::app);
         if (!f){
+            built = true;
             f.open(VOTES_FILE, std::fstream::in | std::fstream::out | std::fstream::trunc);
-            f << "voter" << DELIMITER << "author" << DELIMITER << "permlink" << DELIMITER << "weight" << DELIMITER << "timestamp" << delim_row;
         }
+        if(built)
+            f << "voter author permlink weight timestamp\n";
         for(auto vt : this->votes)
-            f << vt.voter << DELIMITER << vt.author << DELIMITER << vt.ref_v << DELIMITER << vt.weight << DELIMITER << vt.timestamp << delim_row;
+            f << vt.voter << " " << vt.author << " " << vt.ref_v << " " << vt.weight << " " << vt.timestamp << "\n";
         f.close();
     }
 
     void add_to_comments_file(){
         fstream f;
-        if(!std::filesystem::exists(OPERATIONS_FOLDER))
-            std::filesystem::create_directories(OPERATIONS_FOLDER);
+        bool built = false;
+        //if(!std::filesystem::exists(OPERATIONS_FOLDER))
+        //    std::filesystem::create_directories(OPERATIONS_FOLDER);
+        if(!std::experimental::filesystem::exists(OPERATIONS_FOLDER))
+            std::experimental::filesystem::create_directories(OPERATIONS_FOLDER);
         f.open(COMMENTS_FILE, std::fstream::in | std::fstream::out | std::fstream::app);
         if (!f){
+            built = true;
             f.open(COMMENTS_FILE, std::fstream::in | std::fstream::out | std::fstream::trunc);
-            f << "is_post" << DELIMITER << "author" << DELIMITER << "permlink" << DELIMITER << "timestamp"
-                << DELIMITER << "how_published" << DELIMITER << "tags" << DELIMITER << "text" << delim_row;
         }
-        for (auto cmt : this->comments)
-            f << cmt.is_post << DELIMITER << cmt.author << DELIMITER << cmt.permlink << DELIMITER << cmt.timestamp 
-                << DELIMITER << cmt.how_published << DELIMITER << cmt.tags << DELIMITER << cmt.text << delim_row;
+        if(built)
+            f << "is_post"<< DELIMITER << "author" << DELIMITER << "parent_permlink" << DELIMITER << "permlink" << DELIMITER << "timestamp" << DELIMITER
+                << "how_published" << DELIMITER << "tags" << DELIMITER << "text" << DELIM_ROW;
+        for(auto cmt : this->comments){
+            f << cmt.is_post << DELIMITER << cmt.author << DELIMITER << cmt.parent_permlink << DELIMITER << cmt.permlink << DELIMITER << cmt.timestamp
+                << DELIMITER << cmt.how_published << DELIMITER << cmt.tags << DELIMITER << cmt.text << DELIM_ROW;
+        }
+        /* for (auto cmt : this->comments)
+            f << "\"" << cmt.is_post << "\" \"" << cmt.author << "\" \"" << cmt.parent_permlink << "\" \"" <<cmt.permlink << "\" \"" << cmt.timestamp 
+                << "\" \"" << cmt.how_published << "\" \"" << cmt.tags << "\" \"" << cmt.text << "\"\n";
+        */
         /*
         for(auto us : this->steemit_users){
             unordered_map<std::string, CommentHub*> * curr = us.second.get_whole_comments_hub();
             for(auto ch : *curr){
                 std::string permlink = ch.first;
                 CommentHub* c = ch.second;
-                f << string("p") << DELIMITER << us.first << DELIMITER << permlink << DELIMITER << c->get_comment() << delim_row;
+                f << string("p") << DELIMITER << us.first << DELIMITER << permlink << DELIMITER << c->get_comment() << "\"\n";
                 for(CommentHub child : c->get_comment_hub_tree())
-                    f << string("c") << DELIMITER << child.get_author()->get_name() << DELIMITER << permlink << DELIMITER << child.get_comment() << delim_row;
+                    f << string("c") << DELIMITER << child.get_author()->get_name() << DELIMITER << permlink << DELIMITER << child.get_comment() << "\"\n";
             }
         }*/
         f.close();
@@ -239,51 +284,88 @@ private:
 
     void add_to_common_infos_file(){
         fstream f;
-        if(!std::filesystem::exists(OPERATIONS_FOLDER))
-            std::filesystem::create_directories(OPERATIONS_FOLDER);
+        bool built = false;
+        //if(!std::filesystem::exists(OPERATIONS_FOLDER))
+        //    std::filesystem::create_directories(OPERATIONS_FOLDER);
+        if(!std::experimental::filesystem::exists(OPERATIONS_FOLDER))
+            std::experimental::filesystem::create_directories(OPERATIONS_FOLDER);
         f.open(COMMON_INFO_FILE, std::fstream::in | std::fstream::out | std::fstream::app);
         if (!f){
+            built = true;
             f.open(COMMON_INFO_FILE, std::fstream::in | std::fstream::out | std::fstream::trunc);
-            f << "user" << DELIMITER << "is_bot" << DELIMITER << "rep_class" << delim_row;
         }
+        if(built)
+            f << "user is_bot rep_class\n";
         for(auto us : this->info_users)
-            f << us.user << DELIMITER << us.is_user_bot << DELIMITER << us.user_rep_class << delim_row;
+            f << us.user << " " << us.is_user_bot << " " << us.user_rep_class << "\n";
         f.close();
     }
 
     void add_to_follows_file(){
         fstream f;
-        if(!std::filesystem::exists(OPERATIONS_FOLDER))
-            std::filesystem::create_directories(OPERATIONS_FOLDER);
+        bool built = false;
+        //if(!std::filesystem::exists(OPERATIONS_FOLDER))
+        //    std::filesystem::create_directories(OPERATIONS_FOLDER);
+        if(!std::experimental::filesystem::exists(OPERATIONS_FOLDER))
+            std::experimental::filesystem::create_directories(OPERATIONS_FOLDER);
         f.open(FOLLOWS_FILE, std::fstream::in | std::fstream::out | std::fstream::app);
         if (!f){
-            f.open(FOLLOWS_FILE, std::fstream::in | std::fstream::out | std::fstream::trunc);
-            f << "following" << DELIMITER << "follower"  << delim_row;
+            built = true;
+            f.open(FOLLOWS_FILE, std::fstream::in | std::fstream::out | std::fstream::trunc); // 01a4e5613e5ccb86e2eae80be4779811c91b98c8
         }
+        if(built)
+            f << "following follower timestamp\n";
         for(auto fs : this->follows)
-            f << fs.following << DELIMITER << fs.follower << delim_row;
+            f << fs.following << " " << fs.follower << " " << fs.timestamp << "\n";
         f.close();
     }
 
     void add_to_reblogs_file(){
         fstream f;
-        if(!std::filesystem::exists(OPERATIONS_FOLDER))
-            std::filesystem::create_directories(OPERATIONS_FOLDER);
+        bool built = false;
+        //if(!std::filesystem::exists(OPERATIONS_FOLDER))
+        //    std::filesystem::create_directories(OPERATIONS_FOLDER);
+        if(!std::experimental::filesystem::exists(OPERATIONS_FOLDER))
+            std::experimental::filesystem::create_directories(OPERATIONS_FOLDER);
         f.open(REBLOGS_FILE, std::fstream::in | std::fstream::out | std::fstream::app);
         if (!f){
+            built = true;
             f.open(REBLOGS_FILE, std::fstream::in | std::fstream::out | std::fstream::trunc);
-            f << "reblogger" << DELIMITER << "author" << DELIMITER << "permlink" << delim_row;
         }
+        if(built)
+            f << "reblogger author permlink timestamp\n";
         for(auto r : this->reblogs)
-            f << r.account << DELIMITER << r.author << DELIMITER << r.permlink << delim_row;
+            f << r.account << " " << r.author << " " << r.permlink << " " << r.timestamp << "\n";
+        f.close();
+    }
+
+
+    void add_to_transfers_file(){
+        fstream f;
+        bool built = false;
+        //if(!std::filesystem::exists(OPERATIONS_FOLDER))
+        //    std::filesystem::create_directories(OPERATIONS_FOLDER);
+        if(!std::experimental::filesystem::exists(OPERATIONS_FOLDER))
+            std::experimental::filesystem::create_directories(OPERATIONS_FOLDER);
+        f.open(TRANSFERS_FILE, std::fstream::in | std::fstream::out | std::fstream::app);
+        if (!f){
+            built = true;
+            f.open(TRANSFERS_FILE, std::fstream::in | std::fstream::out | std::fstream::trunc);
+        }
+        if(built)
+            f << "sender receiver amount timestamp memo\n";
+        for(auto r : this->transfers)
+            f << r.sender << " " << r.recipient << " " << r.amount << " " << r.timestamp << " " << r.memo << "\n";
         f.close();
     }
 
 
     void add_to_users_file(string users_path, vector<ordered_by_money> us_array){
         fstream f;
-        if(!std::filesystem::exists(FIRST_N_USERS_FOLDER))
-            std::filesystem::create_directories(FIRST_N_USERS_FOLDER);
+        //if(!std::filesystem::exists(FIRST_N_USERS_FOLDER))
+        //    std::filesystem::create_directories(FIRST_N_USERS_FOLDER);
+        if(!std::experimental::filesystem::exists(FIRST_N_USERS_FOLDER))
+            std::experimental::filesystem::create_directories(FIRST_N_USERS_FOLDER);
         string tmp = FIRST_N_USERS_FOLDER + "/" + users_path;
         f.open(tmp, std::fstream::in | std::fstream::out | std::fstream::app);
         if (!f)
@@ -309,7 +391,9 @@ private:
 
 public:
     ParsingBlocks(std::string users_path, std::string rep_path, std::string bot_path) : 
-        users_path(move(users_path)), rep_path(move(rep_path)), bot_path(move(bot_path)) {}
+        users_path(move(users_path)), rep_path(move(rep_path)), bot_path(move(bot_path)) {
+            //this->DELIMITER[1] = 0xDB80;
+        }
 
 
     User * read_single_user(const char * us){
@@ -364,7 +448,7 @@ public:
 
     std::string get_perm_string(std::string permlink){
         std::vector<std::string> link = split(permlink, "-");
-        if(link.size() == 0)
+        if(link.size() <= 2)
             return permlink;
         for(unsigned int i = 0; i < link.size()-1; i++)
             if (link[i].compare(link[i+1]) == 0)
@@ -410,27 +494,34 @@ public:
     }
 
     //void switch_operations(std::string op, Value *op_struct, vector<Operation*>* op_array){
-    void switch_operations(std::string op, Value *op_struct, std::string timestamp, std::string bid){
+    bool switch_operations(std::string op, Value *op_struct, std::string timestamp, std::string bid){
+        bool right = true;
         switch (resolveOperation(op)) {
             case vote: {
                 //cout << "vote" << endl;
-                std::string voter = (*op_struct)["voter"].GetString();
-                std::string author = (*op_struct)["author"].GetString();
-                std::string ref_v  = get_perm_string((*op_struct)["permlink"].GetString());
-                if((voter.compare("") == 0) || (author.compare("") == 0) || (ref_v.compare("") == 0))
+                std::string voter = this->check_presence_for_strings(*op_struct, "voter");
+                if(voter.compare("") == 0)
+                    break;
+                std::string author = this->check_presence_for_strings(*op_struct, "author");
+                if(author.compare("") == 0)
+                    break;
+                std::string ref_v  = get_perm_string(this->check_presence_for_strings(*op_struct, "permlink"));
+                if(ref_v.compare("") == 0)
                     break;
                 try {
-                    User * current = &steemit_users.at(author);
-                    if (current->get_single_comment_hub(ref_v) != nullptr){
-                        int weight = (*op_struct)["weight"].GetInt();
+                    //User * current = &steemit_users.at(author);
+                    //if (current->get_single_comment_hub(ref_v) != nullptr){
+                        int weight = this->check_presence_for_ints(*op_struct, "weight");
+                        if(weight == -1)
+                            break;
                         bool vtr_is_bot = steemit_users.at(voter).is_bot();
                         //Vote * v = new Vote((*op_struct)["voter"].GetString(), author, ref_v, (*op_struct)["weight"].GetInt(), timestamp);
-                        //op_array->push_back((Operation*)v);
+                        //op_array->push_back((Operation*)new Vote());
                         votes.push_back({voter, author, ref_v, weight, timestamp});
-                        current->get_single_comment_hub(ref_v)->add_vote(voter, weight, vtr_is_bot);
+                    //    current->get_single_comment_hub(ref_v)->add_vote(voter, weight, vtr_is_bot);
                         if(vtr_is_bot) { overall_no_vote_bots++;  overall_weight_vote_bots  += weight; }
                         else           { overall_no_vote_users++; overall_weight_vote_users += weight; }
-                    }
+                    //}
                 } catch(const std::out_of_range &e){
                     break;
                 }
@@ -441,9 +532,11 @@ public:
                 if(op_struct->IsObject()){
                     std::string parent_author   =          check_presence_for_strings(*op_struct, "parent_author");
                     std::string author          =          check_presence_for_strings(*op_struct, "author");
-                    std::string permlink = get_perm_string(check_presence_for_strings(*op_struct, "permlink"));
+                    std::string permlink        = get_perm_string(check_presence_for_strings(*op_struct, "permlink"));
+                    std::string parent_permlink = get_perm_string(check_presence_for_strings(*op_struct, "parent_permlink"));
                     std::string title           =          check_presence_for_strings(*op_struct, "title");
                     std::string body            =          check_presence_for_strings(*op_struct, "body");
+
                     std::string json_m          =          check_presence_for_strings(*op_struct, "json_metadata");
                     if (author.compare("") == 0 || permlink.compare("") == 0)
                         break;
@@ -452,30 +545,39 @@ public:
                     std::string community = "";
                     std::string hp = "";
                     std::string tag = "";
-                    if((json_m.compare("") != 0) && (json_m.compare("{}") != 0) && (json_m.compare("\"\"") != 0)){
+                    if(json_m.compare(0, string("{").length(), "{") == 0){
                         Document js;
                         js.Parse<0>(json_m.c_str());
-                        community = search_member(js, "community");
                         tag = search_member(js, "tags");
                         hp = search_member(js, "app");
-                        
+                        community = search_member(js, "community");
                     }
-                    User * auth = &steemit_users.at(author);
-                    CommentHub * current_ch = new CommentHub(title + " " + body + " " + community, auth);
+                    User * auth = nullptr;
+                    auto search = steemit_users.find(author);
+                    if(search != steemit_users.end())
+                        auth = &search->second;
+                    
+                    if(auth == nullptr)
+                        break;
+
+                    //CommentHub * current_ch = new CommentHub(title + " " + body + " " + community, auth);
                     char ispost = (parent_author == "") ? 'p' : 'c';
-                    this->comments.push_back({ispost, author, permlink, timestamp, hp, tag, title + " " + body + " " + community});
-                    current_ch->set_how_published(hp);
-                    current_ch->set_tags(tag);
+                    this->comments.push_back({ispost, author, parent_permlink, permlink, timestamp, hp, tag, title + " " + body + " " + community});
+                    //current_ch->set_how_published(hp);
+                    //current_ch->set_tags(tag);
                     // se è un commento, aggiungo il commento al tree dei commenti che partono dal post
                     if (parent_author != ""){
-                        std::string parent_permlink = get_perm_string(check_presence_for_strings(*op_struct, "parent_permlink"));
-                        CommentHub * parent_ch = steemit_users.at(parent_author).get_single_comment_hub(parent_permlink);
-                        if(parent_ch != nullptr){
-                            current_ch->set_father_comment_hub(parent_ch);
-                            while(parent_ch->get_father_comment_hub() != nullptr)
-                                parent_ch = parent_ch->get_father_comment_hub();
-                            parent_ch->add_in_comment_tree(*current_ch);
-                        }
+                        //std::string parent_permlink = get_perm_string(check_presence_for_strings(*op_struct, "parent_permlink"));
+                        //CommentHub * parent_ch = nullptr;
+                        //auto search = steemit_users.find(parent_author);
+                        //if(search != steemit_users.end())
+                        //    parent_ch = search->second.get_single_comment_hub(parent_permlink);
+                        //if(parent_ch != nullptr){
+                        //    current_ch->set_father_comment_hub(parent_ch);
+                        //    while(parent_ch->get_father_comment_hub() != nullptr)
+                        //        parent_ch = parent_ch->get_father_comment_hub();
+                        //    parent_ch->add_in_comment_tree(*current_ch);
+                        //}
                         auth->increase_num_comment();
                     } else {
                         auth->increase_num_post();
@@ -500,22 +602,23 @@ public:
                             search->count++;
                     }
                     // se è un post o se è un commento aggiungo il post/commento nei contenuti prodotti dall'utente
-                    auth->add_comment_hub(permlink, current_ch);
+                    //auth->add_comment_hub(permlink, current_ch);
                 }
                 break;
             }
             case custom_json: {
+                //cout << "custom json" << endl;
                 Value::ConstMemberIterator itr = op_struct->FindMember("id");
                 if(itr == op_struct->MemberEnd())                          break;
                 if(strcmp(parseNode(itr->value).c_str(), "follow") != 0)   break;
-                vector<std::string> req_posting_auths;
+                /*vector<std::string> req_posting_auths;
                 Value::ConstMemberIterator itr2 = op_struct->FindMember("required_posting_auths");
                 if(itr2 != op_struct->MemberEnd()){
                     if(itr2->value.IsArray()){
                         for(SizeType i = 0; i < itr2->value.Size(); i++)
                             req_posting_auths.push_back( parseNode(itr2->value[i]) );
                     }
-                }
+                }*/
                 Document json_el;
                 std::string j = check_presence_for_strings(*op_struct, "json");
                 if(j.compare("") == 0)
@@ -524,17 +627,20 @@ public:
                 if(json_el.IsArray()){
                     if(json_el[0].IsString()){
                         if(strcmp(json_el[0].GetString(), "follow") == 0){
-                            //cout << "follow" << endl;
                             if(json_el[1].IsObject()){
-                                std::string follower  = json_el[1]["follower" ].GetString();
-                                std::string following = json_el[1]["following"].GetString();
+                                std::string follower = this->check_presence_for_strings(json_el[1], "follower");
+                                if(follower.compare("") == 0)
+                                    break;
+                                std::string following = this->check_presence_for_strings(json_el[1], "following");
+                                if(following.compare("") == 0)
+                                    break;
                                 User * fing = nullptr;
                                 User * fer = nullptr;
                                 auto search = steemit_users.find(following);
                                 if(search != steemit_users.end())
                                     fing = &search->second;
                                 auto search2 = steemit_users.find(follower);
-                                if(search != steemit_users.end())
+                                if(search2 != steemit_users.end())
                                     fer = &search2->second;
                                 if((fing != nullptr) && (fer != nullptr)){
                                     //Value& wh = json_el[1]["what"];
@@ -546,7 +652,7 @@ public:
                                     //catch (const out_of_range& err){ cerr << err.what() << endl; }
                                     //try { steemit_users.at(follower).add_following(&steemit_users.at(following)); } // User follower follows user following 
                                     //catch (const out_of_range& err){ cerr << err.what() << endl; }
-                                    follows.push_back({following, follower});
+                                    follows.push_back({following, follower, timestamp});
                                     fing->add_follower(fer); // follower follows following
                                     fer->add_following(fing); // following is followed by follower
                                     if(fer->is_bot()){
@@ -568,55 +674,61 @@ public:
                             //cout << "end follow" << endl;
                             break;
                         } else if (strcmp(json_el[0].GetString(), "reblog") == 0){
+                            //cout << "reblog" << endl;
                             if(json_el[1].IsObject()){
-                                std::string account  = json_el[1]["account" ].GetString();
-                                std::string author   = json_el[1]["author"  ].GetString();
-
+                                std::string account  = this->check_presence_for_strings(json_el[1], "account");
+                                if(account.compare("") == 0)
+                                    break;
+                                std::string author   = this->check_presence_for_strings(json_el[1], "author");
+                                if(author.compare("") == 0)
+                                    break;
+                                User * raccount = nullptr;
+                                User * rauthor = nullptr;
                                 auto search = steemit_users.find(account);
-                                if(search != steemit_users.end()){
-                                    auto search2 = steemit_users.find(author);
-                                    if(search2 != steemit_users.end()){
-                                        if((&search->second != nullptr) && (&search2->second != nullptr)){
-                                            User * raccount = &search->second;
-                                            User * rauthor = &search2->second;
-                                            std::string permlink = get_perm_string(json_el[1]["permlink"].GetString());
-                                            reblogs.push_back({account, author, permlink});
-                                            //op_array->push_back((Operation*) new CustomJsonReblog(account, author, permlink, req_posting_auths));
-                                            try { 
-                                                CommentHub * ch = rauthor->get_single_comment_hub(permlink);
-                                                if (ch != nullptr)
-                                                    ch->add_reblog(account, raccount->is_bot());
-                                                if (raccount->is_bot())  overall_no_reblog_bots++;
-                                                else                     overall_no_reblog_users++;
-                                            }
-                                            catch(const out_of_range& err) { cerr << err.what() << endl; }
-                                        } else {
-                                            cout << "one of the two accounts involved in the reblog are not in the steemit_users: account: " << account << "\t author: " << author << endl; 
-                                            break;
-                                        }
-                                    }
-
+                                if(search != steemit_users.end())
+                                    raccount = &search->second;
+                                auto search2 = steemit_users.find(author);
+                                if(search2 != steemit_users.end())
+                                    rauthor = &search2->second;
+                                if((raccount != nullptr) && (rauthor != nullptr)){
+                                    std::string permlink = get_perm_string(json_el[1]["permlink"].GetString());
+                                    reblogs.push_back({account, author, permlink, timestamp});
+                                    //op_array->push_back((Operation*) new CustomJsonReblog(account, author, permlink, req_posting_auths));
+                                    //CommentHub * ch = rauthor->get_single_comment_hub(permlink);
+                                    //if (ch != nullptr)
+                                    //    ch->add_reblog(account, raccount->is_bot());
+                                    if (raccount->is_bot())  overall_no_reblog_bots++;
+                                    else                     overall_no_reblog_users++;
+                                } else {
+                                    cout << "one of the two accounts involved in the reblog are not in the steemit_users: account: " << account << "\t author: " << author << endl; 
+                                    break;
                                 }
                             }
                             break;
-                            //cout << "end reblog" << endl;
                         }
                     }
 
                 } else
                     cout << "json_el is not an array, type: " << (*op_struct)["json"].GetType() << endl;
-                //cout << "end custsom_json" << endl;
+                break;
+            }
+            case transfer: {
+                std::string sender    = check_presence_for_strings(*op_struct, "from");
+                std::string recipient = check_presence_for_strings(*op_struct, "to");
+                std::string memo      = check_presence_for_strings(*op_struct, "memo");
+                std::string amount    = check_presence_for_strings(*op_struct, "amount");
+                if ((sender.compare("") == 0) || (recipient.compare("") == 0) || (amount.compare("") == 0))
+                    break;
+                this->transfers.push_back({sender, recipient, memo, amount, timestamp});
+
+                //op_array->push_back((Operation*) new Transfer(
+                //    (*op_struct)["from"].GetString(), (*op_struct)["to"].GetString(), (*op_struct)["amount"].GetString(), (*op_struct)["memo"].GetString()));
                 break;
             }
             /*
             case transfer_to_vesting: {
                 //op_array->push_back((Operation*) new TransferToVesting(
                 //    (*op_struct)["from"].GetString(), (*op_struct)["to"].GetString(), (*op_struct)["amount"].GetString()));
-                break;
-            }
-            case transfer: {
-                //op_array->push_back((Operation*) new Transfer(
-                //    (*op_struct)["from"].GetString(), (*op_struct)["to"].GetString(), (*op_struct)["amount"].GetString(), (*op_struct)["memo"].GetString()));
                 break;
             }
             case withdraw_vesting: {
@@ -638,56 +750,73 @@ public:
                 break;
             }
         }
+        return right;
     }
 
     //vector<Operation*> fill_ops(Value& trans_operations){
-    void fill_ops(Value& trans_operations, std::string tr_timestamp, string bid){
+    bool fill_ops(Value& trans_operations, std::string tr_timestamp, string bid){
         //vector<Operation*> op_array = {};
         for(SizeType i = 0; i < trans_operations.Size(); i++){
             std::string transformed = trans_operations[i][0].GetString();
             transform(transformed.begin(), transformed.end(), transformed.begin(), ::toupper);
             //switch_operations(transformed, &trans_operations[i][1], &op_array);
-            switch_operations(transformed, &trans_operations[i][1], tr_timestamp, bid);
+            if(!switch_operations(transformed, &trans_operations[i][1], tr_timestamp, bid))
+                return false;
         }
-        //return op_array;
+        return true;
     }
 
-    void evaluate_block(const char* line){
+    bool evaluate_block(const char* line){
+        bool toret = true;
         Document root;
         root.Parse<0>(line);
         //BlockStructure * bs = new BlockStructure();
         //bs->set_timestamp   (parseNode(root["timestamp"]));
         //bs->set_witness_name(parseNode(root["witness"  ]));
         //list<Transaction> * transss = new list<Transaction>();
-        if(root["transactions"].IsArray()){
-            for(SizeType i = 0; i < root["transactions"].Size(); i++){
-                string bd = parseNode(root["block_id"]);
-                Value& transact = root["transactions"][i];
-                if(transact.HasMember("operations")){
-                    //vector<Operation*> operations = fill_ops(transact["operations"]);
-                    //if(!operations.empty())
-                    //    t_block->set_operations(operations);
-                    if (std::find(this->jump_transactions_id.begin(), this->jump_transactions_id.end(), 
-                            transact["transaction_id"].GetString()) == this->jump_transactions_id.end())
-                        //fill_ops(transact["operations"], bs->get_timestamp(), transact["transaction_id"].GetString());
-                        fill_ops(transact["operations"], parseNode(root["timestamp"]), transact["transaction_id"].GetString());
-                }
+        if (std::find(this->jump_block_id.begin(), this->jump_block_id.end(),
+            root["block_id"].GetString()) == this->jump_block_id.end()){
 
-                //TransactionBlock * t_block = new TransactionBlock();
-                //std::string tr_id = "";
-                //Value::ConstMemberIterator itr = transact.FindMember("transaction_num");
-                //if(itr != transact.MemberEnd())
-                //    t_block->set_transaction_num(itr->value.GetInt());
-                //Value::ConstMemberIterator itr2 = transact.FindMember("transaction_id");
-                //if(itr2 != transact.MemberEnd())
-                //    tr_id = itr2->value.GetString();
-                //Transaction * t = new Transaction(tr_id, *t_block);
-                //transss->push_back(*t);
+            Value::ConstMemberIterator itr = root.FindMember("transactions");
+            if(itr != root.MemberEnd()){
+                if(itr->value.IsArray()){
+                    for(SizeType i = 0; i < itr->value.Size(); i++){
+                        //string bd = parseNode(root["block_id"]);
+                        Value& transact = root["transactions"][i];
+                        if(transact.HasMember("operations") && root.HasMember("timestamp") && root.HasMember("block_id")){
+                            //vector<Operation*> operations = fill_ops(transact["operations"]);
+                            //bool operations = fill_ops(transact["operations"], parseNode(root["timestamp"]), transact["transaction_id"].GetString());
+                            //if(!operations.empty())
+                            //if(operations)
+                            //    t_block->set_operations(operations);
+                            if (std::find(this->jump_transactions_id.begin(), this->jump_transactions_id.end(), 
+                                    transact["transaction_id"].GetString()) == this->jump_transactions_id.end())
+                                //fill_ops(transact["operations"], bs->get_timestamp(), transact["transaction_id"].GetString());
+                                toret = fill_ops(transact["operations"], parseNode(root["timestamp"]), root["block_id"].GetString());
+                        }
+                        
+                        //if(toret){
+                            //TransactionBlock * t_block = new TransactionBlock();
+                            //std::string tr_id = "";
+                            //Value::ConstMemberIterator itr = transact.FindMember("transaction_num");
+                            //if(itr != transact.MemberEnd())
+                            //    t_block->set_transaction_num(itr->value.GetInt());
+                            //Value::ConstMemberIterator itr2 = transact.FindMember("transaction_id");
+                            //if(itr2 != transact.MemberEnd())
+                            //    tr_id = itr2->value.GetString();
+                            //Transaction * t = new Transaction(tr_id, *t_block);
+                            //transss->push_back(*t);
+                        //}
+                    }
+                }
             }
+            string r = root["block_id"].GetString();
+            if(r.compare("01a4e5613e5ccb86e2eae80be4779811c91b98c8") == 0)
+                toret = false;
         }
         //bs->set_transactions(*transss);
         //bs->print_block();
-        //return *bs;
+        return toret;
     }
 
     static std::string parseNode(const Value &node){
@@ -779,36 +908,45 @@ public:
         std::sort(sbd_users.begin(), sbd_users.end(), greater<ordered_by_money>());
         std::sort(vest_users.begin(), vest_users.end(), greater<ordered_by_money>());
         std::sort(balance_users.begin(), balance_users.end(), greater<ordered_by_money>());
-        sbd_users.resize(N_MAX_USERS);
-        vest_users.resize(N_MAX_USERS);
-        balance_users.resize(N_MAX_USERS);
         this->add_to_users_file(SBD_USERS, sbd_users);
         this->add_to_users_file(VEST_USERS, vest_users);
         this->add_to_users_file(BALANCE_USERS, balance_users);
+        this->add_to_common_infos_file();
+        vector<ordered_by_money>().swap(this->sbd_users);
+        vector<ordered_by_money>().swap(this->vest_users);
+        vector<ordered_by_money>().swap(this->balance_users);
+        vector<common_informations>().swap(this->info_users);
+
         auto stop3 = timer::milli_step(start3);
         std::cout << "Finished to sort and save users on sbd, vesting_shares and balance in " << stop3 << " millisec." << endl;
 
     }
 
     void parsing_blocks(std::string blocks_path){
-
-        this->votes.clear();
-        this->follows.clear();
-        this->reblogs.clear();
-        this->comments.clear();
-        this->votes.shrink_to_fit();
-        this->follows.shrink_to_fit();
-        this->reblogs.shrink_to_fit();
-        this->comments.shrink_to_fit();
+        {
+            vector<vote_element>().swap(this->votes);
+            vector<follow_element>().swap(this->follows);
+            vector<reblog_element>().swap(this->reblogs);
+            vector<comment_element>().swap(this->comments);
+            vector<transfer_element>().swap(this->transfers);
+        }
         auto parser = [&](std::string line_ps){ return evaluate_block(line_ps.c_str()); };
         ifstream blocks_file(blocks_path);
         auto start1 = timer::start();
         std::string users_line = "";
+        bool not_jump = true;
         while(getline(blocks_file, users_line)){
+            if(!not_jump){
+                not_jump = true;
+                break;
+            }
             auto fut  = std::async(parser, users_line);
-            //auto _get = fut.get();
+            not_jump = fut.get();
+            if(!not_jump)
+                cout << "Errore nel parsing di un blocco." << endl;
             //blocks.push_back(_get);
         }
+        blocks_file.close();
         auto stop1 = timer::milli_step(start1);
         std::cout << blocks_path << ": finished to read blocks in " << stop1 << " millisec." << endl;
 
@@ -817,7 +955,8 @@ public:
         this->add_to_follows_file();
         this->add_to_reblogs_file();
         this->add_to_comments_file();
-        this->add_to_common_infos_file();
+        this->add_to_transfers_file();
+        
         auto stop2 = timer::milli_step(start2);
         std::cout << "Finished to save votes, follows and reblogs in " << stop2 << " millisec." << endl;
 
@@ -903,7 +1042,7 @@ public:
     vector<std::string> get_how_publish_users(){ return how_publish(this->how_users_published); }
     vector<std::string> get_how_publish_bots() { return how_publish(this->how_bots_published);  }
 
-
+    /*
     list<std::string> all_comment_hubs(std::string author){
         unordered_map<std::string, CommentHub*> * tmp = steemit_users.at(author).get_whole_comments_hub();
         list<std::string> hubs;
@@ -917,11 +1056,42 @@ public:
         }
         return hubs;
     }
+    */
 
     //vector<BlockStructure> get_blocks(){ return this->blocks; }
 
     unordered_map<std::string, User> get_users(){ return this->steemit_users; }
 
+    void write_steemit_users_info(){
+        fstream f;
+        //if(!std::filesystem::exists(OPERATIONS_FOLDER))
+        //    std::filesystem::create_directories(OPERATIONS_FOLDER);
+        if(!std::experimental::filesystem::exists(OPERATIONS_FOLDER))
+            std::experimental::filesystem::create_directories(OPERATIONS_FOLDER);
+        f.open(USERS_FILE, std::fstream::in | std::fstream::out | std::fstream::app);
+        if (!f){
+            f.open(USERS_FILE, std::fstream::in | std::fstream::out | std::fstream::trunc);
+        }
+        for(auto author : this->steemit_users){
+            User s = author.second;
+            f << "\"" << author.first << "\" \"" << s.is_bot() << "\" \"" << s.rep_class_name() << "\" \"" << s.steem_power() << "\" \"" 
+                << s.get_no_post() << "\" \"" << s.get_no_comment() << "\" \"" << s.get_no_reblog() << "\" \"" << s.get_balance() << "\" \"" 
+                << s.get_savings_balance() << "\" \"" << s.get_sbd_balance() << "\" \"" << s.get_vesting_shares() << "\" \"" 
+                << s.get_reward_sbd_balance() << "\" \"" << s.get_reward_steem_balance() << "\" \"" << s.get_reward_vesting_balance() 
+                << "\" \"" << s.get_curation_rewards() << "\" \"" << s.get_posting_rewards() << "\" ";
+
+            f << "\"" << s.get_followers().size() << "\" ";
+            for(User * followers : s.get_followers())
+                f << "\"" << followers->get_name() << "\" \"" << followers->is_bot() << "\" ";
+            f << "\"" << s.get_following().size() << "\" ";
+            for(User * following : s.get_following())
+                f << "\"" << following->get_name() << "\" \"" << following->is_bot() << "\" ";
+            f << "\n";
+        }
+        f.close();
+    }
+
+    /*
     void save_by_repclass_file(std::string author){
         User u = steemit_users.at(author);
         list<string> to_save = all_comment_hubs(author);
@@ -939,7 +1109,7 @@ public:
             }
         }
     }
-
+    
     void save_by_repclass_file(){
         for(auto u : this->steemit_users){
             list<string> to_save = all_comment_hubs(u.first);
@@ -975,6 +1145,7 @@ public:
         }
         saving(".", CMT_HUBS_FILE, to_save);
     }
+    */
 
     void save_frequencies_to_file(){
         fstream f;

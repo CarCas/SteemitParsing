@@ -12,11 +12,11 @@
 
 using namespace std;
 
-enum ReputationClasses{Whale, Shark, Dolphin, Minnow, Plankton, Error};
+enum ReputationClasses{Whale, Shark, Dolphin, Minnow, Plankton};
 
 // CommentHub and User's classes!!
 
-class CommentHub;
+//class CommentHub;
 
 class User{
 
@@ -34,7 +34,7 @@ private:
     string                              name;
 
 
-    unordered_map<string, CommentHub*>  comments_hub;
+    //unordered_map<string, CommentHub*>  comments_hub;
     
 
     int                                 no_post;
@@ -96,22 +96,18 @@ public:
         if (steem_power >    SHARK_LOWER)  return Shark;
         if (steem_power >  DOLPHIN_LOWER)  return Dolphin;
         if (steem_power >   MINNOW_LOWER)  return Minnow;
-        if (steem_power > PLANKTON_LOWER)  return Plankton;
-        else                               return Error;
+        else                               return Plankton;
     }
 
     ReputationClasses rep_class()               { return this->reputation_class; }
     string            rep_class_name()          {
-        std::string s("Error");
+        std::string s("Plankton");
         switch (this->reputation_class){
             case Whale:    { s = "Whale";    } break;
             case Shark:    { s = "Shark";    } break;
             case Dolphin:  { s = "Dolphin";  } break;
             case Minnow:   { s = "Minnow";   } break;
-            case Plankton: { s = "Plankton"; } break;
-            default: {
-                break; 
-            }
+            default:       { break; }
         }
         return s;
     }
@@ -122,14 +118,14 @@ public:
     int  reputation()        { return this->rep; }
     void reputation(int r)   { this->rep = r; }
 
-    void add_comment_hub(string& permlink, CommentHub * ch) { this->comments_hub.insert({permlink, ch}); }
+    //void add_comment_hub(string& permlink, CommentHub * ch) { this->comments_hub.insert({permlink, ch}); }
 
-    CommentHub * get_single_comment_hub(string &permlink) {
-        auto search = this->comments_hub.find(permlink);
-        return (search != this->comments_hub.end()) ? search->second : nullptr;
-    }
+    //CommentHub * get_single_comment_hub(string &permlink) {
+    //    auto search = this->comments_hub.find(permlink);
+    //   return (search != this->comments_hub.end()) ? search->second : nullptr;
+    //}
     
-    unordered_map<string, CommentHub*> * get_whole_comments_hub(){ return &this->comments_hub; }
+    //unordered_map<string, CommentHub*> * get_whole_comments_hub(){ return &this->comments_hub; }
 
     void add_follower(User* u) { 
         this->followers.push_back(u);
@@ -218,11 +214,11 @@ public:
 };
 
 
-
+/*
 class CommentHub {
 
 private:
-    std::string delim_row = string(1, DELIMITER) + DELIMITER;
+    //std::string delim_row = string(1, DELIMITER) + DELIMITER;
 
     struct weighted_user{
         string user;
@@ -252,12 +248,13 @@ private:
     bool already_written;
 
 public:
+*/
     /*CommentHub () {
         this->father = new CommentHub("");
         this->comment_tree = new list<CommentHub>();
         this->reblogs_user = list<string>();
     }*/
-    
+/*    
     CommentHub (const string& comment, User* author) {
         this->comment = comment;
         this->author = author;
@@ -318,22 +315,23 @@ public:
         string toret = "";
         this->already_written = true;
         for (auto c : this->comment_tree){
-            string header = c.author->get_name() + DELIMITER;
+            string header = "A: \"" + c.author->get_name() + "\"\n";
             string body = "";
             string trailing = "";
-            if(c.get_comment().find_first_not_of(" ") != std::string::npos)
-                body = c.get_comment() + DELIMITER;
-            if(body != ""){
+            if(c.get_comment().find_first_not_of(" ") != std::string::npos){
+                body = "B: \"" + c.get_comment() + "\"\n";
+                trailing = "V: ";
                 for(auto s : this->votes_user)
-                    trailing = trailing + s.user + DELIMITER + to_string(s.weight) + DELIMITER;
+                    trailing = trailing + "\"" + s.user + "\" \"" + to_string(s.weight) + "\" ";
+                trailing = trailing + "\nR: ";
                 for(string s : this->reblogs_user)
-                    trailing = trailing + s + DELIMITER;
-                toret = toret + header + body + c.tags + DELIMITER + trailing + delim_row;
+                    trailing = trailing + "\"" + s + "\" ";
+                toret = toret + header + body + "\"T: " + c.tags + "\"\n" + trailing + "\n";
             }
         }
         return toret;
     }
-
+*/
     /*
     void swap(CommentHub& ch){
         CommentHub tmp = move(ch);
@@ -348,5 +346,6 @@ public:
         list<CommentHub>().swap(comment_tree);
         list<string>().swap(reblogs_user);
     }*/
-    
+/*    
 };
+*/

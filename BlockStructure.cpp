@@ -15,6 +15,8 @@ string Operation::print(){
     return "";
 }
 
+Vote::Vote(){}
+
 Vote::Vote(string voter, string author, string permlink, int weigth, string timestamp) : voter(move(voter)), author(move(author)),
     permlink(move(permlink)), timestamp(move(timestamp)), weight(weigth) { this->kind = VOTE; }
 

@@ -45,8 +45,9 @@
 #define COMMENTS_FILE       OPERATIONS_FOLDER + "/comments.csv"
 #define FOLLOWS_FILE        OPERATIONS_FOLDER + "/follows.csv"
 #define REBLOGS_FILE        OPERATIONS_FOLDER + "/reblogs.csv"
+#define TRANSFERS_FILE      OPERATIONS_FOLDER + "/transfers.csv"
 #define COMMON_INFO_FILE    OPERATIONS_FOLDER + "/common_info_users.csv"
-
+#define USERS_FILE          OPERATIONS_FOLDER + "/users_infos.csv"
 
 #define FIRST_N_USERS_FOLDER    FOLDER_PRODUCED + "/sorted_users"
 
@@ -56,6 +57,7 @@
 
 #define FREQUENCIES         FOLDER_PRODUCED + "/frequencies.dat"
 
-#define N_MAX_USERS 10000
+#define DELIMITER char(254)
+#define DELIM_ROW char(255)
 
-#define DELIMITER char(255)
+//#define N_MAX_USERS 10000

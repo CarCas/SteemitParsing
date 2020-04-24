@@ -2,12 +2,12 @@
 #include "ParsingBlocks.hpp"
 
 int main(int argc, char *argv[]) {
-    if(argc == 1){
+    if(argc <= 1){
         cout << "Pass me: the accounts information, the reputations file, the list of bots and the " << 
             "file paths of the various files to parse or re-execute me with the --help option!" << endl;
         return 1;
     }
-    if(string(argv[1]).compare("--help") == 0){
+    if((string(argv[1]).compare("--help") == 0) || (string(argv[1]).compare("-h") == 0)){
         cout << "For parsing I need the path of the various files: it's not enough just the filename. " << 
         "After waiting a while, I'll return and you'll see a new folder in the same folder of this .out file!" << endl;
         return 0;
@@ -42,7 +42,7 @@ int main(int argc, char *argv[]) {
     std::cout << "Size of users list: " << pb->get_users().size() << std::endl;
     //std::cout << "Size of blocks: " << blocks.size() << std::endl;
     auto start = timer::start();
-    pb->save_by_repclass_file();
+    pb->write_steemit_users_info();
     auto stop = timer::milli_step(start);
     std::cout << "Saving to file all CommentHubs tooks " << stop << " millisec." << std::endl;
     auto start2 = timer::start();
@@ -55,8 +55,3 @@ int main(int argc, char *argv[]) {
     
     return 0;
 }
-
-
-
-
-// PROCESSO PID SU MACCHINA REMOTA: 151711
